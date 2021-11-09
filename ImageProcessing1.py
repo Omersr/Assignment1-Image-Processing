@@ -1,6 +1,6 @@
 import cv2
 import os
-#gygh
+#gyghsa
 # path = r'C:\Users\Omer\Desktop\birb.png'
 root_path = os.path.dirname(os.path.abspath(__file__))
 path = cv2.imread(os.path.join(root_path, "index.jpeg"))
