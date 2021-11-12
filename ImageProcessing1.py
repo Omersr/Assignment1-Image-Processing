@@ -78,7 +78,7 @@ while True:
                 break
                 cv2.destroyAllWindows()
 
-        #medial line bending
+        ##medial line bending
         img = cache
         axisa = abs(median - px)
         axisb = round(abs(iy-jy)/2)
