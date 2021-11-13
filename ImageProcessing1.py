@@ -63,22 +63,28 @@ def interpolate_img(rectangle_img, x_intersection, y_intersection, interpolation
     print(rectangle_img.shape)
     interpolated_img = np.zeros((rec_height, rec_length, 3), np.uint8)
     parab_heights = get_parab_heights(x_intersection, y_intersection, rec_height)
-    reached_parabola = False
     for k in range(rec_height):
+        reached_parabola = False
         max_offset = floor(parab_heights[k])
         parabola_intersection = max_offset + rec_length / 2
         offset = 0
+        offset_reduction = 0
         for i in range(rec_length):
             # pixel = rectangle_img[k][rec_length - i - 1]
-            new_pixel = interpolate(rectangle_img, (k, rec_length - i - 1), offset, interpolation_flag)
+            new_pixel = interpolate(
+                rectangle_img, (k, rec_length - i - 1), offset, interpolation_flag
+            )
             ## as if we're iterating through the image right to left
             interpolated_img[k][rec_length - i - 1] = new_pixel
             if not reached_parabola:
                 offset = round(max_offset * (i / parabola_intersection))
             else:
-                offset = round(max_offset * ((rec_length - i) / parabola_intersection))
-            if offset == max_offset:
+                offset_reduction -= 1
+                offset = max_offset * (offset_reduction / (rec_length - parabola_intersection))
+            if offset >= max_offset:
                 reached_parabola = True
+                offset_reduction = rec_length - parabola_intersection
+            offset = round(offset)
     return interpolated_img
 
 
@@ -169,7 +175,7 @@ while True:
         print(jx)
         print(iy)
         print(ix)
-        new_img = interpolate_img(img[iy : jy, ix:jx], axisa, axisb, "nn")
+        new_img = interpolate_img(img[iy:jy, ix:jx], axisa, axisb, "bicubic")
         cv2.imshow("Title of Popup Window", new_img)
         cv2.waitKey(0)
         break
