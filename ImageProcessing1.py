@@ -3,6 +3,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from math import sqrt, floor
+import scipy.ndimage
 
 # path = r'C:\Users\Omer\Desktop\birb.png'
 root_path = os.path.dirname(os.path.abspath(__file__))
@@ -68,8 +69,8 @@ def interpolate_img(rectangle_img, x_intersection, y_intersection, interpolation
         parabola_intersection = max_offset + rec_length / 2
         offset = 0
         for i in range(rec_length):
-            pixel = rectangle_img[k][rec_length - i - 1]
-            new_pixel = interpolate(rectangle_img, pixel, offset, interpolation_flag)
+            # pixel = rectangle_img[k][rec_length - i - 1]
+            new_pixel = interpolate(rectangle_img, (k, rec_length - i - 1), offset, interpolation_flag)
             ## as if we're iterating through the image right to left
             interpolated_img[k][rec_length - i - 1] = new_pixel
             if not reached_parabola:
@@ -92,17 +93,19 @@ def get_height(y, x_intersection, y_intersection):
     return sqrt((1 - ((y ** 2) / y_intersection ** 2)) * (x_intersection ** 2))
 
 
-def interpolate(rectangle_img, pixel, offset, interpolation_flag):
+def interpolate(rectangle_img, pixel_coordinates, offset, interpolation_flag):
+    height = pixel_coordinates[0]
+    width = pixel_coordinates[1] + offset
     if interpolation_flag == "nn":
-        pixels = find_k_nearest(rectangle_img, 1, (pixel[0], pixel[1] - offset))
+        pixels = find_k_nearest(rectangle_img, 1, (width, height))
         weights = np.full(shape=(1, 1), fill_value=1, dtype=float)
         return np.dot(pixels, weights).transpose()
     if interpolation_flag == "bilinear":
-        pixels = find_k_nearest(rectangle_img, 4, (pixel[0], pixel[1] - offset))
+        pixels = find_k_nearest(rectangle_img, 4, (width, height))
         weights = np.full(shape=(4, 1), fill_value=0.25, dtype=float)
         return np.dot(pixels, weights).transpose()
     if interpolation_flag == "bicubic":
-        pixels = find_k_nearest(rectangle_img, 16, (pixel[0], pixel[1] - offset))
+        pixels = find_k_nearest(rectangle_img, 16, (width, height))
         weights = np.full(shape=(16, 1), fill_value=1 / 16, dtype=float)
         return np.dot(pixels, weights).transpose()
     return
@@ -166,7 +169,7 @@ while True:
         print(jx)
         print(iy)
         print(ix)
-        new_img = interpolate_img(img[iy : jy + 1, ix:jx], axisa, axisb, "bicubic")
+        new_img = interpolate_img(img[iy : jy, ix:jx], axisa, axisb, "nn")
         cv2.imshow("Title of Popup Window", new_img)
         cv2.waitKey(0)
         break
