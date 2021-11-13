@@ -55,33 +55,41 @@ def draw_curve(event, x, y, flags, param):
 
 
 def interpolate_img(rectangle_img, x_intersection, y_intersection, interpolation_flag):
-    rec_height = abs(jy - jx)
+    rec_height = abs(jy - iy)
     if rec_height % 2 != 0:
         rec_height += 1
     rec_length = abs(jx - ix)
     print(rectangle_img.shape)
     interpolated_img = np.zeros((rec_height, rec_length, 3), np.uint8)
     parab_heights = get_parab_heights(x_intersection, y_intersection, rec_height)
+    reached_parabola = False
     for k in range(rec_height):
         max_offset = floor(parab_heights[k])
+        parabola_intersection = max_offset + rec_length / 2
         offset = 0
         for i in range(rec_length):
-            pixel = rectangle_img[k][i]
+            pixel = rectangle_img[k][rec_length - i - 1]
             new_pixel = interpolate(rectangle_img, pixel, offset, interpolation_flag)
-            interpolated_img[k][i] = new_pixel
-            offset = round(max_offset * (i / rec_length))
+            ## as if we're iterating through the image right to left
+            interpolated_img[k][rec_length - i - 1] = new_pixel
+            if not reached_parabola:
+                offset = round(max_offset * (i / parabola_intersection))
+            else:
+                offset = round(max_offset * ((rec_length - i) / parabola_intersection))
+            if offset == max_offset:
+                reached_parabola = True
     return interpolated_img
 
 
 def get_parab_heights(x_intersection, y_intersection, rectangle_height):
     return [
-        get_height(x, x_intersection, y_intersection)
-        for x in range(-x_intersection, x_intersection)
+        get_height(y, x_intersection, y_intersection)
+        for y in range(-y_intersection, y_intersection)
     ]
 
 
-def get_height(x, x_intersection, y_intersection):
-    return sqrt((1 - ((x ** 2) / x_intersection ** 2)) * (y_intersection ** 2))
+def get_height(y, x_intersection, y_intersection):
+    return sqrt((1 - ((y ** 2) / y_intersection ** 2)) * (x_intersection ** 2))
 
 
 def interpolate(rectangle_img, pixel, offset, interpolation_flag):
@@ -95,7 +103,7 @@ def interpolate(rectangle_img, pixel, offset, interpolation_flag):
         return np.dot(pixels, weights).transpose()
     if interpolation_flag == "bicubic":
         pixels = find_k_nearest(rectangle_img, 16, (pixel[0], pixel[1] - offset))
-        weights = np.full(shape=(4, 1), fill_value=1 / 16, dtype=float)
+        weights = np.full(shape=(16, 1), fill_value=1 / 16, dtype=float)
         return np.dot(pixels, weights).transpose()
     return
 
@@ -109,10 +117,10 @@ def find_k_nearest(img, k, target):
     distances = distances.flatten()
     k_nearest = np.argpartition(distances, k)
     pixel_locations = nonzero[k_nearest[:k]]
-    print(pixel_locations)
+    # print(pixel_locations)
     pixel_colors = np.ndarray(shape=(k, 3))
     for i in range(k):
-        pixel_colors[i] = img[pixel_locations[i][0, 0], pixel_locations[i][0, 1]]
+        pixel_colors[i] = img[pixel_locations[i][0, 1], pixel_locations[i][0, 0]]
     return pixel_colors.transpose()
 
 
@@ -158,7 +166,7 @@ while True:
         print(jx)
         print(iy)
         print(ix)
-        new_img = interpolate_img(img[iy : jy + 1, ix:jx], axisa, axisb, "nn")
+        new_img = interpolate_img(img[iy : jy + 1, ix:jx], axisa, axisb, "bicubic")
         cv2.imshow("Title of Popup Window", new_img)
         cv2.waitKey(0)
         break
