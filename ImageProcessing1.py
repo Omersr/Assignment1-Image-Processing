@@ -9,6 +9,7 @@ import scipy.ndimage
 root_path = os.path.dirname(os.path.abspath(__file__))
 path = cv2.imread(os.path.join(root_path, "index.jpeg"))
 img = path
+img_copy = path.copy()
 # variables
 ix = -1
 iy = -1
@@ -55,32 +56,54 @@ def draw_curve(event, x, y, flags, param):
         py = y
 
 
-def interpolate_img(rectangle_img, x_intersection, y_intersection, interpolation_flag):
-    rec_height = abs(jy - iy)
-    if rec_height % 2 != 0:
-        rec_height += 1
-    rec_length = abs(jx - ix)
-    print(rectangle_img.shape)
-    interpolated_img = np.zeros((rec_height, rec_length, 3), np.uint8)
+def interpolate_img(
+    rectangle_img, x_intersection, y_intersection, interpolation_flag, offset_direction
+):
+    upper_left_x, upper_left_y = min(ix, jx), min(iy, jy)
+    lower_right_x, lower_right_y = max(ix, jx), max(iy, jy)
+    rec_height = lower_right_y - upper_left_y
+    # if rec_height % 2 != 0:
+    #     rec_height += 1
+    rec_length = lower_right_x - upper_left_x
+
+    # interpolated_img = np.zeros((rec_height, rec_length, 3), np.uint8)
+    interpolated_img = img_copy.copy()
     parab_heights = get_parab_heights(x_intersection, y_intersection, rec_height)
-    for k in range(rec_height):
+    for k in range(upper_left_y - 1, lower_right_y):
         reached_parabola = False
-        max_offset = floor(parab_heights[k])
+        max_offset = floor(parab_heights[k - upper_left_y])
         parabola_intersection = max_offset + rec_length / 2
         offset = 0
         offset_reduction = 0
-        for i in range(rec_length):
+        for i in range(upper_left_x - 1, lower_right_x):
             # pixel = rectangle_img[k][rec_length - i - 1]
-            new_pixel = interpolate(
-                rectangle_img, (k, rec_length - i - 1), offset, interpolation_flag
-            )
-            ## as if we're iterating through the image right to left
-            interpolated_img[k][rec_length - i - 1] = new_pixel
+            j = i - (upper_left_x - 1)
+            if offset_direction < 0:
+                new_pixel = interpolate(
+                    img_copy,
+                    (k, i),
+                    (offset_direction * offset),
+                    interpolation_flag,
+                )
+                ## as if we're iterating through the image right to left
+                interpolated_img[k][i] = new_pixel
+            else:
+                new_pixel = interpolate(
+                    img_copy,
+                    # (k, rec_length + upper_left_x - 1 - (i - (upper_left_x - 1))),
+                    (k, lower_right_x - j - 1),
+                    (offset_direction * offset),
+                    interpolation_flag,
+                )
+                ## as if we're iterating through the image right to left
+                interpolated_img[k][lower_right_x - j - 1] = new_pixel
             if not reached_parabola:
-                offset = round(max_offset * (i / parabola_intersection))
+                offset = round(max_offset * (j / parabola_intersection))
             else:
                 offset_reduction -= 1
-                offset = max_offset * (offset_reduction / (rec_length - parabola_intersection))
+                offset = max_offset * (
+                    offset_reduction / (rec_length - parabola_intersection)
+                )
             if offset >= max_offset:
                 reached_parabola = True
                 offset_reduction = rec_length - parabola_intersection
@@ -102,17 +125,39 @@ def get_height(y, x_intersection, y_intersection):
 def interpolate(rectangle_img, pixel_coordinates, offset, interpolation_flag):
     height = pixel_coordinates[0]
     width = pixel_coordinates[1] + offset
+    # iy:jy, ix:jx
     if interpolation_flag == "nn":
         pixels = find_k_nearest(rectangle_img, 1, (width, height))
         weights = np.full(shape=(1, 1), fill_value=1, dtype=float)
         return np.dot(pixels, weights).transpose()
     if interpolation_flag == "bilinear":
         pixels = find_k_nearest(rectangle_img, 4, (width, height))
-        weights = np.full(shape=(4, 1), fill_value=0.25, dtype=float)
+        # weights = np.full(shape=(4, 1), fill_value=0.25, dtype=float)
+        weights = np.array([[1 / 2], [1 / 4], [1 / 8], [1 / 8]])
         return np.dot(pixels, weights).transpose()
     if interpolation_flag == "bicubic":
         pixels = find_k_nearest(rectangle_img, 16, (width, height))
-        weights = np.full(shape=(16, 1), fill_value=1 / 16, dtype=float)
+        # weights = np.full(shape=(16, 1), fill_value=1 / 16, dtype=float)
+        weights = np.array(
+            [
+                [1 / 4],
+                [1 / 4],
+                [1 / 8],
+                [1 / 8],
+                [1 / 16],
+                [1 / 16],
+                [1 / 32],
+                [1 / 32],
+                [1 / 64],
+                [1 / 64],
+                [1 / 128],
+                [1 / 128],
+                [1 / 256],
+                [1 / 256],
+                [1 / 256],
+                [1 / 256],
+            ]
+        )
         return np.dot(pixels, weights).transpose()
     return
 
@@ -143,6 +188,9 @@ while True:
         break
         cv2.destroyAllWindows()
     if d:
+        ## force square to be even
+        if abs(jy - iy) % 2 != 0:
+            jy += 1
         cv2.imshow("Title of Popup Window", img)
         median = round((ix + jx) / 2)
         median2 = round((iy + jy) / 2)
@@ -161,6 +209,11 @@ while True:
         img = cache
         axisa = abs(median - px)
         axisb = round(abs(iy - jy) / 2)
+        # check bending direction
+        if median < px:
+            offset_direction = -1
+        else:
+            offset_direction = 1
         if median > px:
             cv2.ellipse(
                 img, (median, median2), (axisa, axisb), 0, 90, 270, (0, 0, 255), 2
@@ -171,11 +224,9 @@ while True:
             )
         # Displaying the image
         cv2.imshow("Title of Popup Window", img)
-        print(jy)
-        print(jx)
-        print(iy)
-        print(ix)
-        new_img = interpolate_img(img[iy:jy, ix:jx], axisa, axisb, "bicubic")
+        new_img = interpolate_img(
+            img[iy:jy, ix:jx], axisa, axisb, "bicubic", offset_direction
+        )
         cv2.imshow("Title of Popup Window", new_img)
         cv2.waitKey(0)
         break
