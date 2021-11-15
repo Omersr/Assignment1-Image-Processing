@@ -3,7 +3,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from math import sqrt, floor
-import scipy.ndimage
+#import scipy.ndimage
 
 # path = r'C:\Users\Omer\Desktop\birb.png'
 root_path = os.path.dirname(os.path.abspath(__file__))
@@ -56,6 +56,7 @@ def draw_curve(event, x, y, flags, param):
 
 
 def interpolate_img(rectangle_img, x_intersection, y_intersection, interpolation_flag):
+
     rec_height = abs(jy - iy)
     if rec_height % 2 != 0:
         rec_height += 1
@@ -63,29 +64,66 @@ def interpolate_img(rectangle_img, x_intersection, y_intersection, interpolation
     print(rectangle_img.shape)
     interpolated_img = np.zeros((rec_height, rec_length, 3), np.uint8)
     parab_heights = get_parab_heights(x_intersection, y_intersection, rec_height)
-    for k in range(rec_height):
-        reached_parabola = False
-        max_offset = floor(parab_heights[k])
-        parabola_intersection = max_offset + rec_length / 2
-        offset = 0
-        offset_reduction = 0
-        for i in range(rec_length):
-            # pixel = rectangle_img[k][rec_length - i - 1]
-            new_pixel = interpolate(
-                rectangle_img, (k, rec_length - i - 1), offset, interpolation_flag
-            )
-            ## as if we're iterating through the image right to left
-            interpolated_img[k][rec_length - i - 1] = new_pixel
-            if not reached_parabola:
-                offset = round(max_offset * (i / parabola_intersection))
-            else:
-                offset_reduction -= 1
-                offset = max_offset * (offset_reduction / (rec_length - parabola_intersection))
-            if offset >= max_offset:
-                reached_parabola = True
-                offset_reduction = rec_length - parabola_intersection
-            offset = round(offset)
-    return interpolated_img
+    print("parab_heights:",parab_heights)
+    print("length parab height",len(parab_heights))
+    print (rec_height)
+#I added a boolean that checks if it is right or left interpolation
+    if not rightinterpolation:
+        for k in range(rec_height):
+            reached_parabola = False
+            max_offset = floor(parab_heights[k])
+            parabola_intersection = max_offset + rec_length / 2
+
+            offset = 0
+            offset_reduction = 0
+            for i in range(rec_length):
+                # pixel = rectangle_img[k][rec_length - i - 1]
+                new_pixel = interpolate(
+                    rectangle_img, (k, rec_length - i - 1), offset, interpolation_flag
+                )
+                ## as if we're iterating through the image right to left
+                interpolated_img[k][rec_length - i - 1] = new_pixel
+                if not reached_parabola:
+                    offset = round(max_offset * (i / parabola_intersection))
+                else:
+                    offset_reduction -= 1
+                    offset = max_offset * (offset_reduction / (rec_length - parabola_intersection))
+                if offset >= max_offset:
+                    reached_parabola = True
+                    offset_reduction = rec_length - parabola_intersection
+                offset = round(offset)
+        return interpolated_img
+    #until here it is suppose to be ok
+
+# Omer's Changes!!!!!!!!!!!!!
+    else:
+        for k in range(rec_height):
+            reached_parabola = False
+            max_offset = floor(parab_heights[k])
+            parabola_intersection = (rec_length / 2) - max_offset
+            offset = 0
+            offset_reduction = 0
+            for i in range(rec_length):
+                # pixel = rectangle_img[k][rec_length - i - 1]
+                new_pixel = interpolate(
+                    rectangle_img, (k, rec_length-i-1), offset, interpolation_flag
+                )
+                ## as if we're iterating through the image right to left
+                interpolated_img[k][rec_length-i-1] = new_pixel
+                if not reached_parabola:
+                    offset = round(max_offset * (i / parabola_intersection))*-1
+                else:
+                    offset_reduction += 1
+                    offset = max_offset * (offset_reduction /(rec_length - parabola_intersection))*-1
+                if offset >= max_offset:
+                    reached_parabola = True
+                   # offset_reduction = rec_length - parabola_intersection
+                    offset_reduction = parabola_intersection
+                offset = round(offset)
+        return interpolated_img
+
+
+# Omer's Changes!!!!!!!!!!!!!
 
 
 def get_parab_heights(x_intersection, y_intersection, rectangle_height):
@@ -161,7 +199,10 @@ while True:
         img = cache
         axisa = abs(median - px)
         axisb = round(abs(iy - jy) / 2)
-        if median > px:
+        #checks if we should iteroplate to the left or to the right
+        rightinterpolation = median < px
+        print ("right?", rightinterpolation)
+        if not rightinterpolation:
             cv2.ellipse(
                 img, (median, median2), (axisa, axisb), 0, 90, 270, (0, 0, 255), 2
             )
@@ -172,9 +213,15 @@ while True:
         # Displaying the image
         cv2.imshow("Title of Popup Window", img)
         print(jy)
-        print(jx)
         print(iy)
+        print(jx)
         print(ix)
+        if abs(jy-iy)%2!=0:
+            if jy%2!=0:
+                jy=jy-1
+            else:
+                iy=iy+1
+        print("height", abs(jy - iy))
         new_img = interpolate_img(img[iy:jy, ix:jx], axisa, axisb, "bicubic")
         cv2.imshow("Title of Popup Window", new_img)
         cv2.waitKey(0)
